@@ -216,5 +216,119 @@ func SchedulePage(c *gin.Context) {
 }
 
 func GetDataBooking(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "GetDataBooking response"})
+	var input schemas.BookingInput
+
+	// 1. Tangkap dan Validasi Input JSON
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Input tidak valid: " + err.Error()})
+		return
+	}
+
+	// Atur zona waktu ke WIB (Asia/Jakarta)
+	loc, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		loc = time.Local // Fallback ke zona waktu server jika Asia/Jakarta tidak ditemukan
+	}
+
+	var waktuMulai, waktuSelesai time.Time
+	var sesiStr *string
+	var jumlahHari *int
+
+	// 2. Proses Logika Berdasarkan Tipe Booking
+	if input.TipeBooking == "SESI" {
+		// Validasi: Jika pilih SESI, tanggal awal dan akhir WAJIB sama
+		if input.TanggalAwal != input.TanggalAkhir {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Untuk tipe SESI, tanggal_awal dan tanggal_akhir harus sama"})
+			return
+		}
+
+		// Validasi: Sesi tidak boleh kosong
+		if input.Sesi == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Sesi harus diisi (1, 2, atau 3)"})
+			return
+		}
+
+		var jamMulai, jamSelesai string
+		s := ""
+
+		// Pemetaan Jam sesuai Sesi
+		switch *input.Sesi {
+		case 1:
+			jamMulai = "08:00:00"
+			jamSelesai = "10:00:00"
+			s = "PAGI"
+		case 2:
+			jamMulai = "10:00:00"
+			jamSelesai = "12:00:00"
+			s = "SIANG"
+		case 3:
+			jamMulai = "13:00:00"
+			jamSelesai = "15:00:00"
+			s = "SORE" // Asumsi sesi 3 masuk kategori enum MALAM di database
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Pilihan sesi tidak valid. Gunakan 1, 2, atau 3"})
+			return
+		}
+
+		sesiStr = &s
+
+		// Gabungkan string tanggal dan jam, lalu parse menjadi time.Time
+		waktuMulai, _ = time.ParseInLocation("2006-01-02 15:04:05", fmt.Sprintf("%s %s", input.TanggalAwal, jamMulai), loc)
+		waktuSelesai, _ = time.ParseInLocation("2006-01-02 15:04:05", fmt.Sprintf("%s %s", input.TanggalAkhir, jamSelesai), loc)
+
+	} else if input.TipeBooking == "HARIAN" {
+		// Asumsi Jam Default untuk Booking Harian: Check-in 14:00, Check-out 12:00
+		waktuMulai, err = time.ParseInLocation("2006-01-02 15:04:05", fmt.Sprintf("%s 14:00:00", input.TanggalAwal), loc)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Format tanggal_awal salah. Gunakan YYYY-MM-DD"})
+			return
+		}
+
+		waktuSelesai, err = time.ParseInLocation("2006-01-02 15:04:05", fmt.Sprintf("%s 12:00:00", input.TanggalAkhir), loc)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Format tanggal_akhir salah. Gunakan YYYY-MM-DD"})
+			return
+		}
+
+		// Hitung murni selisih hari dari kalender
+		tAwal, _ := time.Parse("2006-01-02", input.TanggalAwal)
+		tAkhir, _ := time.Parse("2006-01-02", input.TanggalAkhir)
+		hari := int(tAkhir.Sub(tAwal).Hours() / 24)
+
+		// Validasi agar tanggal akhir tidak lebih mundur dari tanggal awal
+		if hari <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Tanggal akhir harus lebih besar dari tanggal awal"})
+			return
+		}
+
+		jumlahHari = &hari
+
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tipe_booking tidak valid, gunakan 'SESI' atau 'HARIAN'"})
+		return
+	}
+
+	// 3. Mapping ke Struct Database (dari models yang dibuat sebelumnya)
+	// Catatan: Pastikan CustomerID diisi, misalnya dari payload JWT token milik user yang login.
+	newBooking := schemas.Booking{
+		// CustomerID:  "...", // TODO: Ambil ID dari user yang sedang login
+		TipeBooking:  input.TipeBooking,
+		Sesi:         sesiStr,
+		JumlahHari:   jumlahHari,
+		WaktuMulai:   waktuMulai,
+		WaktuSelesai: waktuSelesai,
+		Status:       "PENDING",
+	}
+
+	// TODO: Simpan ke database menggunakan GORM
+	// if err := config.DB.Create(&newBooking).Error; err != nil {
+	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menyimpan data booking"})
+	// 	return
+	// }
+
+	// 4. Return Response Berhasil
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Data booking berhasil diproses",
+		"data":    newBooking,
+	})
 }

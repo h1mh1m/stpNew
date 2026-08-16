@@ -37,15 +37,16 @@ func main() {
 	authrized := route.Group("/")
 	authrized.Use(users.AuthMiddlewareJwt())
 	{
-		route.GET("/Beranda")
-		route.GET("/View")
-		route.GET("/Schedule")
-		route.GET("/Profile")
-		route.GET("/Booking")
-		route.POST("/Booking")
-		route.PATCH("/Profile/Change-Password")
+		route.GET("/Beranda", users.DashboardPage)
+		route.GET("/View", users.ViewPage)
+		route.GET("/Schedule", users.SchedulePage)
+		route.GET("/Profile", users.DashboardPage)
+		// route.GET("/Booking",)
+		// route.POST("/Booking")
+		// route.PATCH("/Profile/Change-Password")
 	}
-
+	route.POST("/login", users.LoginAlur)
+	route.POST("/Signup", users.SignupAlur)
 	// 5. Read server port from environment or default to 3000
 	route.Run("3000")
 }
