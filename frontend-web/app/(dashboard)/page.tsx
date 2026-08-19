@@ -1,52 +1,62 @@
-import React from 'react';
+'use client';
+
+import React, { useEffect, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { RoomCard } from '@/components/dashboard/RoomCard';
 import Link from 'next/link';
-
-const rooms = [
-  {
-    id: 1,
-    title: 'Lab Pemrograman 1',
-    department: 'Departemen Teknik Informatika ITS',
-    location: 'Zona A',
-    capacity: 25,
-    price: 'Rp 90.000',
-    unit: 'per Jam',
-    tag: 'Jangka Pendek'
-  },
-  {
-    id: 2,
-    title: 'Lab Pemrograman 2',
-    department: 'Departemen Teknik Informatika ITS',
-    location: 'Zona A',
-    capacity: 25,
-    price: 'Rp 100.000',
-    unit: 'per Jam',
-    tag: 'Jangka Pendek'
-  },
-  {
-    id: 3,
-    title: 'Gedung NASDEC',
-    department: 'Institut Teknologi Sepuluh Nopember',
-    location: 'Zona C',
-    capacity: 100,
-    price: 'Rp 5.000.000',
-    unit: 'per Bulan',
-    tag: 'Jangka Panjang'
-  },
-  {
-    id: 4,
-    title: 'Menara Sains',
-    department: 'Institut Teknologi Sepuluh Nopember',
-    location: 'Zona C',
-    capacity: 50,
-    price: 'Rp 10.000.000',
-    unit: 'per Tahun',
-    tag: 'Jangka Panjang'
-  },
-];
+import { useRouter } from 'next/navigation';
 
 export default function Dashboard() {
+  const router = useRouter();
+  const [rooms, setRooms] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRooms = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          router.push('/signin');
+          return;
+        }
+
+        const res = await fetch('http://localhost:3000/api/Beranda', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (!res.ok) {
+          throw new Error('Failed to fetch rooms');
+        }
+
+        const data = await res.json();
+        // Map the backend data to match the frontend RoomCard props
+        const formattedRooms = (data.data || []).map((room: any) => ({
+          id: room.id,
+          title: room.name,
+          department: room.description.split(' - ')[0] || 'Unknown',
+          location: room.description.split(' - ')[1] || 'Unknown',
+          capacity: room.capacity,
+          price: `Rp ${room.price.toLocaleString('id-ID')}`,
+          unit: room.features === 'Jangka Pendek' ? 'per Jam' : 'per Bulan',
+          tag: room.features
+        }));
+
+        setRooms(formattedRooms);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRooms();
+  }, [router]);
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
   return (
     <div className="max-w-6xl mx-auto pb-12">
       {/* Hero Section */}

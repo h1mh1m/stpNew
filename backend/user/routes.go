@@ -149,7 +149,7 @@ func SignupAlur(c *gin.Context) {
 
 	if resendAPI != "" && secretToken != "" {
 		client := resend.NewClient(resendAPI)
-		verifyLink := fmt.Sprintf("http://localhost:8080/verify?token=%s", secretToken)
+		verifyLink := fmt.Sprintf("http://localhost:3000/api/verify?token=%s&email=%s", secretToken, person.Email)
 		params := &resend.SendEmailRequest{
 			From:    "Onboarding <onboarding@resend.dev>",
 			To:      []string{person.Email},
@@ -171,8 +171,86 @@ func ViewPage(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "You're in View Page"})
 }
 
+func VerifyEmail(c *gin.Context) {
+	token := c.Query("token")
+	email := c.Query("email")
+	secretToken := os.Getenv("SECRET")
+
+	if token == "" || email == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Token atau email tidak valid"})
+		return
+	}
+
+	if token != secretToken {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Token verifikasi salah"})
+		return
+	}
+
+	var user schemas.Customer
+	if err := databases.DB.Where("email = ?", email).First(&user).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User tidak ditemukan"})
+		return
+	}
+
+	if user.Status == "Verified" {
+		c.JSON(http.StatusOK, gin.H{"message": "Email sudah terverifikasi sebelumnya"})
+		return
+	}
+
+	user.Status = "Verified"
+	if err := databases.DB.Save(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menyimpan status verifikasi"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Email berhasil diverifikasi! Anda sekarang dapat login."})
+}
+
 func DashboardPage(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "You're in Dashboard Page"})
+	// Mock rooms data since database isn't fully seeded yet
+	rooms := []schemas.Room{
+		{
+			ID:          "1",
+			Name:        "Lab Pemrograman 1",
+			Description: "Departemen Teknik Informatika ITS - Zona A",
+			Capacity:    25,
+			Price:       90000,
+			ImageURL:    "",
+			Features:    "Jangka Pendek",
+		},
+		{
+			ID:          "2",
+			Name:        "Lab Pemrograman 2",
+			Description: "Departemen Teknik Informatika ITS - Zona A",
+			Capacity:    25,
+			Price:       100000,
+			ImageURL:    "",
+			Features:    "Jangka Pendek",
+		},
+		{
+			ID:          "3",
+			Name:        "Gedung NASDEC",
+			Description: "Institut Teknologi Sepuluh Nopember - Zona C",
+			Capacity:    100,
+			Price:       5000000,
+			ImageURL:    "",
+			Features:    "Jangka Panjang",
+		},
+		{
+			ID:          "4",
+			Name:        "Menara Sains",
+			Description: "Institut Teknologi Sepuluh Nopember - Zona C",
+			Capacity:    50,
+			Price:       10000000,
+			ImageURL:    "",
+			Features:    "Jangka Panjang",
+		},
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Success",
+		"data":    rooms,
+	})
 }
 
 func SchedulePage(c *gin.Context) {
@@ -215,6 +293,112 @@ func SchedulePage(c *gin.Context) {
 	})
 }
 
-func GetDataBooking(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "GetDataBooking response"})
+func GetBookings(c *gin.Context) {
+	userId, exists := c.Get("id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var orders []schemas.Order
+	if err := databases.DB.Where("user_id = ?", userId).Find(&orders).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch orders"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Success",
+		"data":    orders,
+	})
+}
+
+func CreateBooking(c *gin.Context) {
+	userId, exists := c.Get("id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req schemas.BookingSchema
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Schedule Conflict Validation
+	// Overlap occurs if: new_start < existing_finish AND new_finish > existing_start
+	var existingOrder schemas.Order
+	conflictErr := databases.DB.Where("room_id = ? AND status IN (?, ?) AND date_start < ? AND date_finish > ?", 
+		req.RoomID, "Selesai", "Menunggu Pembayaran", req.DateFinish, req.DateStart).First(&existingOrder).Error
+	
+	if conflictErr == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Room is already booked for the selected schedule. Schedule Conflict!"})
+		return
+	} else if !errors.Is(conflictErr, gorm.ErrRecordNotFound) {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error checking schedule conflicts"})
+		return
+	}
+
+	// If no conflict, mock finding the room for price (using a dummy price for now)
+	var room schemas.Room
+	databases.DB.Where("id = ?", req.RoomID).First(&room)
+	price := room.Price
+	if price == 0 {
+		price = 100000 // default dummy price if not seeded
+	}
+
+	orderId := uuid.NewString()
+	newOrder := schemas.Order{
+		ID:         orderId,
+		UserID:     userId.(string),
+		RoomID:     req.RoomID,
+		DateStart:  req.DateStart,
+		DateFinish: req.DateFinish,
+		Status:     "Menunggu Pembayaran",
+		TotalPrice: price,
+	}
+
+	if err := databases.DB.Create(&newOrder).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create booking"})
+		return
+	}
+
+	// System Payment Mock
+	paymentLink := fmt.Sprintf("http://localhost:3000/api/payments/pay?order_id=%s", orderId)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Booking created successfully",
+		"payment_link": paymentLink,
+		"data": newOrder,
+	})
+}
+
+func MockPaymentWebhook(c *gin.Context) {
+	orderId := c.Query("order_id")
+	if orderId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Order ID is required"})
+		return
+	}
+
+	var order schemas.Order
+	if err := databases.DB.Where("id = ?", orderId).First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	if order.Status == "Selesai" {
+		c.JSON(http.StatusOK, gin.H{"message": "Order is already paid"})
+		return
+	}
+
+	order.Status = "Selesai"
+	if err := databases.DB.Save(&order).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update payment status"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Payment successful. Order is now Selesai.",
+		"order": order,
+	})
 }

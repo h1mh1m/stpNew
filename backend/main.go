@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 	databases "stpNew/backend/database"
 	schemas "stpNew/backend/schema"
 	users "stpNew/backend/user"
@@ -21,7 +22,7 @@ func main() {
 
 	// 3. Run GORM AutoMigration for database models
 	if databases.DB != nil {
-		if err := databases.DB.AutoMigrate(&schemas.Customer{}, &schemas.Admin{}); err != nil {
+		if err := databases.DB.AutoMigrate(&schemas.Customer{}, &schemas.Admin{}, &schemas.Room{}, &schemas.Order{}); err != nil {
 			log.Printf("Warning: Auto Migration failed: %v\n", err)
 		} else {
 			log.Println("Database AutoMigration complete")
@@ -32,18 +33,24 @@ func main() {
 	route := gin.Default()
 
 	// Enable CORS Middleware for frontend web integration
-	// route.Use(corsMiddleware())
+	route.Use(corsMiddleware())
 
-	authrized := route.Group("/")
+	// Public routes
+	route.POST("/api/login", users.LoginAlur)
+	route.POST("/api/signup", users.SignupAlur)
+	route.GET("/api/verify", users.VerifyEmail)
+	route.GET("/api/payments/pay", users.MockPaymentWebhook)
+
+	authrized := route.Group("/api")
 	authrized.Use(users.AuthMiddlewareJwt())
 	{
-		route.GET("/Beranda")
-		route.GET("/View")
-		route.GET("/Schedule")
-		route.GET("/Profile")
-		route.GET("/Booking")
-		route.POST("/Booking")
-		route.PATCH("/Profile/Change-Password")
+		authrized.GET("/Beranda", users.DashboardPage)
+		authrized.GET("/View", users.ViewPage)
+		authrized.GET("/Schedule", users.SchedulePage)
+		authrized.GET("/Profile", users.ViewPage) // placeholder
+		authrized.GET("/Bookings", users.GetBookings)
+		authrized.POST("/Bookings", users.CreateBooking)
+		authrized.PATCH("/Profile/Change-Password", users.ViewPage) // placeholder
 	}
 
 	// 5. Read server port from environment or default to 3000
@@ -51,18 +58,18 @@ func main() {
 }
 
 // corsMiddleware sets headers to allow cross-origin requests from web frontends
-// func corsMiddleware() gin.HandlerFunc {
-// 	return func(c *gin.Context) {
-// 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-// 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-// 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
-// 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
+func corsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
 
-// 		if c.Request.Method == "OPTIONS" {
-// 			c.AbortWithStatus(http.StatusNoContent)
-// 			return
-// 		}
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
 
-// 		c.Next()
-// 	}
-// }
+		c.Next()
+	}
+}

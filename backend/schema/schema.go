@@ -30,7 +30,7 @@ type Admin struct {
 }
 
 type Claims struct {
-	IdUser string `json:id`
+	IdUser string `json:"id"`
 	jwt.RegisteredClaims
 }
 
@@ -46,8 +46,33 @@ type SignupSchema struct {
 	Password    string `json:"password"`
 }
 type BookingSchema struct {
-	dateStart  string ``
-	dateFinish string ``
+	RoomID     string `json:"room_id"`
+	DateStart  string `json:"date_start"`
+	DateFinish string `json:"date_finish"`
+}
+
+type Room struct {
+	ID          string    `gorm:"primaryKey;column:id" json:"id"`
+	Name        string    `gorm:"column:name" json:"name"`
+	Description string    `gorm:"column:description" json:"description"`
+	Capacity    int       `gorm:"column:capacity" json:"capacity"`
+	Price       float64   `gorm:"column:price" json:"price"`
+	ImageURL    string    `gorm:"column:image_url" json:"image_url"`
+	Features    string    `gorm:"column:features" json:"features"`
+	CreatedAt   time.Time `gorm:"column:created_at" json:"created_at"`
+	UpdatedAt   time.Time `gorm:"column:updated_at" json:"updated_at"`
+}
+
+type Order struct {
+	ID         string    `gorm:"primaryKey;column:id" json:"id"`
+	UserID     string    `gorm:"column:user_id" json:"user_id"`
+	RoomID     string    `gorm:"column:room_id" json:"room_id"`
+	DateStart  string    `gorm:"column:date_start" json:"date_start"`
+	DateFinish string    `gorm:"column:date_finish" json:"date_finish"`
+	Status     string    `gorm:"column:status" json:"status"`
+	TotalPrice float64   `gorm:"column:total_price" json:"total_price"`
+	CreatedAt  time.Time `gorm:"column:created_at" json:"created_at"`
+	UpdatedAt  time.Time `gorm:"column:updated_at" json:"updated_at"`
 }
 
 type LoginAdminSchema struct {

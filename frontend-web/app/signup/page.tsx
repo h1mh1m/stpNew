@@ -2,12 +2,51 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Footer } from '@/components/layout/Footer';
 
 export default function SignUpPage() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  const [nama, setNama] = useState('');
+  const [email, setEmail] = useState('');
+  const [nomorTelpon, setNomorTelpon] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch('http://localhost:3000/api/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nama,
+          email,
+          nomor_telpon: nomorTelpon,
+          password
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || data.message || 'Registration failed');
+      }
+
+      alert('Registration successful! Please check your email.');
+      router.push('/signin');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-[#484555]">
@@ -49,57 +88,81 @@ export default function SignUpPage() {
           <div className="w-full md:w-1/2 bg-white p-10 md:p-14 flex flex-col justify-center">
             <h2 className="text-xl font-bold text-[#171C1F] mb-8">Register External Clients & Drivers</h2>
             
-            <div className="space-y-5 mb-6">
-              <Input 
-                label="Email Address" 
-                type="email" 
-                placeholder="driver@example.com" 
-                leftIcon={
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                    <polyline points="22,6 12,13 2,6"></polyline>
-                  </svg>
-                }
-              />
+            <form onSubmit={handleSignUp}>
+              {error && <div className="mb-4 text-red-500 text-sm">{error}</div>}
               
-              <div>
+              <div className="space-y-4 mb-6">
                 <Input 
-                  label="Password"
-                  type={showPassword ? "text" : "password"} 
-                  placeholder="••••••••" 
+                  label="Full Name" 
+                  type="text" 
+                  placeholder="John Doe" 
+                  value={nama}
+                  onChange={(e) => setNama(e.target.value)}
+                  required
+                />
+                
+                <Input 
+                  label="Email Address" 
+                  type="email" 
+                  placeholder="driver@example.com" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
                   leftIcon={
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                      <polyline points="22,6 12,13 2,6"></polyline>
                     </svg>
                   }
-                  rightIcon={
-                    <div onClick={() => setShowPassword(!showPassword)} className="cursor-pointer hover:text-black text-gray-400">
-                      {showPassword ? (
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                          <circle cx="12" cy="12" r="3"></circle>
-                          <line x1="3" y1="3" x2="21" y2="21"></line>
-                        </svg>
-                      ) : (
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                          <circle cx="12" cy="12" r="3"></circle>
-                        </svg>
-                      )}
-                    </div>
-                  }
                 />
+
+                <Input 
+                  label="Phone Number" 
+                  type="tel" 
+                  placeholder="+1234567890" 
+                  value={nomorTelpon}
+                  onChange={(e) => setNomorTelpon(e.target.value)}
+                  required
+                />
+                
+                <div>
+                  <Input 
+                    label="Password"
+                    type={showPassword ? "text" : "password"} 
+                    placeholder="••••••••" 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    leftIcon={
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                      </svg>
+                    }
+                    rightIcon={
+                      <div onClick={() => setShowPassword(!showPassword)} className="cursor-pointer hover:text-black text-gray-400">
+                        {showPassword ? (
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <line x1="3" y1="3" x2="21" y2="21"></line>
+                          </svg>
+                        ) : (
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                          </svg>
+                        )}
+                      </div>
+                    }
+                  />
+                </div>
               </div>
-            </div>
 
-            <Link href="#" className="text-sm font-semibold text-[#512BD4] hover:underline mb-8 self-start">
-              Forgot Password?
-            </Link>
-
-            <Button className="w-full h-12 mb-6">
-              Sign Up
-            </Button>
+              <Button type="submit" className="w-full h-12 mb-6" isLoading={loading} disabled={loading}>
+                Sign Up
+              </Button>
+            </form>
             
             <p className="text-center text-sm text-[#171C1F]">
               Already have an account? <Link href="/signin" className="font-semibold text-[#512BD4] hover:underline">Sign in</Link>

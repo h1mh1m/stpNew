@@ -2,12 +2,48 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Footer } from '@/components/layout/Footer';
 
 export default function SignInPage() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch('http://localhost:3000/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.message || data.error || 'Login failed');
+      }
+
+      // Store JWT token
+      localStorage.setItem('token', data.user);
+      
+      // Redirect to dashboard
+      router.push('/');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F6FAFE]">
@@ -47,11 +83,16 @@ export default function SignInPage() {
             </div>
           </div>
 
-          <div className="text-left space-y-4 mb-8">
+          <form onSubmit={handleSignIn} className="text-left space-y-4 mb-8">
+            {error && <div className="text-red-500 text-sm">{error}</div>}
+            
             <Input 
               label="Email Address" 
               type="email" 
               placeholder="Enter your email" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
             />
             
             <div>
@@ -64,6 +105,9 @@ export default function SignInPage() {
               <Input 
                 type={showPassword ? "text" : "password"} 
                 placeholder="Enter your password" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
                 rightIcon={
                   <div onClick={() => setShowPassword(!showPassword)} className="cursor-pointer hover:text-black">
                     {showPassword ? (
@@ -82,11 +126,11 @@ export default function SignInPage() {
                 }
               />
             </div>
-          </div>
 
-          <Button className="w-full h-12 text-[15px] mb-6">
-            Sign In
-          </Button>
+            <Button type="submit" className="w-full h-12 text-[15px] mb-6 mt-4" isLoading={loading} disabled={loading}>
+              Sign In
+            </Button>
+          </form>
 
           <p className="text-sm text-gray-600">
             Don&apos;t have an account?{' '}

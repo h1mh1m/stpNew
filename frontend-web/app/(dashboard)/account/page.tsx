@@ -35,7 +35,7 @@ export default function AccountPage() {
               </div>
               <div>
                 <p className="text-sm font-semibold text-gray-900">0123456789</p>
-                <p className="text-xs text-gray-500">ID</p>
+                <p className="text-xs text-gray-500">NRP / NIP / NIK</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -97,8 +97,30 @@ export default function AccountPage() {
               <div className="flex items-start gap-4">
                 <div className="mt-0.5 text-gray-500"><User size={20} /></div>
                 <div>
+                  <p className="text-sm font-semibold text-gray-900 group-hover:text-[#512BD4] transition-colors">Foto Diri</p>
+                  <p className="text-xs text-gray-500">Ubah foto profil atau pas foto Anda</p>
+                </div>
+              </div>
+              <ChevronRight size={20} className="text-gray-400" />
+            </div>
+
+            <div className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors group">
+              <div className="flex items-start gap-4">
+                <div className="mt-0.5 text-gray-500"><User size={20} /></div>
+                <div>
                   <p className="text-sm font-semibold text-gray-900 group-hover:text-[#512BD4] transition-colors">Nama</p>
-                  <p className="text-xs text-gray-500">Ubah nama panggilan</p>
+                  <p className="text-xs text-gray-500">Ubah nama lengkap</p>
+                </div>
+              </div>
+              <ChevronRight size={20} className="text-gray-400" />
+            </div>
+
+            <div className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors group">
+              <div className="flex items-start gap-4">
+                <div className="mt-0.5 text-gray-500"><CreditCard size={20} /></div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900 group-hover:text-[#512BD4] transition-colors">Nomor Identitas (NRP / NIP / NIK)</p>
+                  <p className="text-xs text-gray-500">Masukkan NIK untuk pendaftar umum, atau NRP/NIP untuk ITS</p>
                 </div>
               </div>
               <ChevronRight size={20} className="text-gray-400" />
