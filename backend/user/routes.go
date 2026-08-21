@@ -332,3 +332,26 @@ func GetDataBooking(c *gin.Context) {
 		"data":    newBooking,
 	})
 }
+func EditProfilAccount(c *gin.Context) {
+
+	user_id, exist := c.Get("IdUser")
+	if !exist {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "Unthorized data id"})
+		return
+	}
+	var akun schemas.EditProfilAccountSchema
+	if err := c.ShouldBindBodyWithJSON(&akun); err == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no data get"})
+		return
+	}
+	err := databases.DB.Where("ID = ?", user_id).Updates(schemas.Customer{Nama: akun.Nama, Email: akun.Email, NomerTelpon: akun.NomorTelpon})
+	if err == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot Update data"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Can update data user",
+		"data":    err,
+	})
+
+}

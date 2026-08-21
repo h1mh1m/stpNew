@@ -99,3 +99,9 @@ type LoginAdminSchema struct {
 	Email    string `form:"email" json:"email" binding:"required, email"`
 	Password string `form:"password" json:"password" binding:"required"`
 }
+
+type EditProfilAccountSchema struct {
+	Nama        string `json:"nama"`
+	Email       string `json:"email"`
+	NomorTelpon string `json:"nomor_telpon"`
+}
