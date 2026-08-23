@@ -105,3 +105,9 @@ type EditProfilAccountSchema struct {
 	Email       string `json:"email"`
 	NomorTelpon string `json:"nomor_telpon"`
 }
+
+type ChangePasswordSchema struct {
+	OldPassword    string `json:"Password"`
+	NewPassword    string `json:"NewPassword"`
+	RetypePassword string `json:"RetypePassword"`
+}

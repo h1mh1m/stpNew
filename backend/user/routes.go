@@ -355,3 +355,33 @@ func EditProfilAccount(c *gin.Context) {
 	})
 
 }
+func ChangePassword(c *gin.Context) {
+	user_id, exist := c.Get("IdUser")
+	if !exist {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot get Id"})
+		return
+	}
+	var akun schemas.ChangePasswordSchema
+	if err := c.ShouldBindBodyWithJSON(&akun); err == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Check your input"})
+	}
+	var person schemas.Customer
+	if err := databases.DB.Where("ID = ?", user_id).Find(&person).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot get password"})
+		return
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(person.Password), []byte(akun.OldPassword)); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Salah masukkan password lama "})
+		return
+	}
+	bytes, err := bcrypt.GenerateFromPassword([]byte(akun.RetypePassword), 12)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Cannot generate New Password"})
+		return
+	}
+	if err := databases.DB.Model(schemas.Customer{}).Where("ID = ?", user_id).Update("password", string(bytes)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Cannot Update New Password"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Password Is Updated"})
+}
