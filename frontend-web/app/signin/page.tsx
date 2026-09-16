@@ -45,6 +45,12 @@ export default function SignInPage() {
     }
   };
 
+  const handleSSOLogin = () => {
+    // Mock login for frontend testing without backend
+    localStorage.setItem('token', 'mock-sso-token');
+    router.push('/');
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-[#F6FAFE]">
       <main className="flex-grow flex items-center justify-center p-6">
@@ -63,6 +69,7 @@ export default function SignInPage() {
 
           <Button 
             variant="secondary" 
+            onClick={handleSSOLogin}
             className="w-full mb-6 font-medium text-black bg-[#F0F4F8] hover:bg-[#E2E8F0]"
             leftIcon={
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-[#512BD4]">

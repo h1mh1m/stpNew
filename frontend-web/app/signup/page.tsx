@@ -39,7 +39,7 @@ export default function SignUpPage() {
         throw new Error(data.error || data.message || 'Registration failed');
       }
 
-      alert('Registration successful! Please check your email.');
+      alert('Registration successful!');
       router.push('/signin');
     } catch (err: any) {
       setError(err.message);

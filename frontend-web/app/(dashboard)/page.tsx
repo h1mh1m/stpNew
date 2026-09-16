@@ -1,94 +1,92 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { ChevronRight } from 'lucide-react';
-import { RoomCard } from '@/components/dashboard/RoomCard';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { MapPin, ExternalLink } from 'lucide-react';
 
 export default function Dashboard() {
-  const router = useRouter();
   const [rooms, setRooms] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchRooms = async () => {
       try {
         const token = localStorage.getItem('token');
-        if (!token) {
-          router.push('/signin');
-          return;
-        }
+        if (!token) return;
 
         const res = await fetch('http://localhost:3000/api/Beranda', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+          headers: { 'Authorization': `Bearer ${token}` }
         });
-
-        if (!res.ok) {
-          throw new Error('Failed to fetch rooms');
-        }
-
         const data = await res.json();
-        // Map the backend data to match the frontend RoomCard props
-        const formattedRooms = (data.data || []).map((room: any) => ({
-          id: room.id,
-          title: room.name,
-          department: room.description.split(' - ')[0] || 'Unknown',
-          location: room.description.split(' - ')[1] || 'Unknown',
-          capacity: room.capacity,
-          price: `Rp ${room.price.toLocaleString('id-ID')}`,
-          unit: room.features === 'Jangka Pendek' ? 'per Jam' : 'per Bulan',
-          tag: room.features
-        }));
-
-        setRooms(formattedRooms);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
+        setRooms(data.data || []);
+      } catch (err) {
+        console.error(err);
       }
     };
-
     fetchRooms();
-  }, [router]);
+  }, []);
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
   return (
-    <div className="max-w-6xl mx-auto pb-12">
+    <div className="max-w-7xl mx-auto pb-12 space-y-8">
       {/* Hero Section */}
-      <div className="relative w-full h-[350px] overflow-hidden rounded-2xl mb-12">
-        <div className="absolute inset-0 bg-[#512BD4]"></div>
-        <div className="absolute inset-0 flex flex-col justify-center px-10 md:px-16 text-white">
-          <h1 className="text-3xl md:text-4xl font-bold mb-4 max-w-2xl">Selamat Datang di Wiranala!</h1>
-          <p className="text-lg text-white/90 max-w-xl mb-8">
-            Temukan ruangan dengan kualitas dan harga terbaik untuk menunjang segala kebutuhan Anda
-          </p>
-          <Link href="/rooms" className="inline-flex items-center justify-center bg-[#007bff] hover:bg-[#0056b3] text-white px-6 py-3 rounded-lg font-semibold w-max transition-colors">
-            Cari Ruangan
-            <ChevronRight className="w-5 h-5 ml-2" />
-          </Link>
-        </div>
+      <div className="w-full h-[400px] rounded-3xl overflow-hidden relative bg-gray-200">
+        <img 
+          src="https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&q=80&w=2070" 
+          alt="Campus Building" 
+          className="w-full h-full object-cover"
+        />
       </div>
 
-      {/* Tempat Kerja yang Nyaman Section */}
-      <div className="bg-white p-8 rounded-2xl border border-gray-200">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Tempat Kerja yang Nyaman</h2>
-        <p className="text-gray-500 mb-8">Temukan berbagai pilihan ruangan kantor yang nyaman untuk menunjang kebutuhan kerja Anda</p>
+      {/* Main Content */}
+      <div className="bg-white p-8 md:p-12 rounded-3xl shadow-sm border border-gray-100">
+        <h2 className="text-3xl font-bold text-gray-900 mb-3 flex items-center gap-3">
+          <span>🏁</span> Temukan Sirkuit Terbaik untuk Kebutuhan Anda
+        </h2>
+        <p className="text-gray-600 mb-10 text-lg">
+          Pilih sirkuit yang sesuai dengan kebutuhan Anda, lengkap dengan informasi fasilitas, lokasi, dan harga sewa
+        </p>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-          {rooms.map((room) => (
-            <RoomCard key={room.id} {...room} />
-          ))}
-        </div>
-
-        <div className="flex justify-center">
-          <Link href="/rooms" className="bg-[#007bff] hover:bg-[#0056b3] text-white px-8 py-3 rounded-lg font-semibold transition-colors">
-            Lihat Semua Ruangan
-          </Link>
+        {/* Circuit Cards Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {rooms.length > 0 ? rooms.map((room) => (
+            <div key={room.ID} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+              <div className="h-64 bg-gray-200 relative">
+                <img 
+                  src={room.ImageURL || "https://images.unsplash.com/photo-1580274455191-1c62238fa333?auto=format&fit=crop&q=80&w=1000"} 
+                  alt={room.Name} 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="p-8">
+                <div className="inline-block px-4 py-1.5 bg-[#007bff] text-white text-sm font-medium rounded-full mb-4">
+                  {room.Features || 'Jangka Pendek'}
+                </div>
+                <h3 className="text-3xl font-bold text-gray-900 mb-1">{room.Name}</h3>
+                <p className="text-gray-500 mb-6 text-xl">{room.Description}</p>
+                
+                <div className="flex items-start justify-between gap-6 mb-6">
+                  <div className="flex items-start gap-3">
+                    <MapPin className="w-6 h-6 text-[#007bff] shrink-0 mt-0.5" />
+                    <p className="text-gray-600 text-base leading-relaxed max-w-sm">
+                      Lokasi: {room.Description}
+                    </p>
+                  </div>
+                  <a href="#" className="flex items-center gap-1 text-[#007bff] text-sm font-medium hover:underline shrink-0">
+                    <ExternalLink className="w-4 h-4" />
+                    Lihat di Maps
+                  </a>
+                </div>
+                
+                <div className="pt-6 border-t border-gray-100">
+                  <p className="text-4xl font-bold text-[#007bff] tracking-tight">
+                    Rp {room.Price ? room.Price.toLocaleString('id-ID') : '0'}
+                  </p>
+                  <p className="text-gray-800 text-xl font-bold mt-2">per Jam</p>
+                </div>
+              </div>
+            </div>
+          )) : (
+            <p className="text-gray-500">Memuat data sirkuit...</p>
+          )}
         </div>
       </div>
     </div>
