@@ -6,6 +6,7 @@ import (
 	"os"
 	databases "stpNew/backend/database"
 	schemas "stpNew/backend/schema"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -38,9 +39,27 @@ func AdminLogin(c *gin.Context) {
 
 }
 
-var JwtAdminSign string = os.Getenv("JWTADMIN")
+func getAdminJwtSecret() ([]byte, error) {
+	secret := strings.TrimSpace(os.Getenv("JWTADMIN"))
+	if secret == "" {
+		return nil, errors.New("JWTADMIN secret is empty or not configured")
+	}
+	if len(secret) < 8 {
+		return nil, errors.New("JWTADMIN secret is unsafe (must be at least 8 characters)")
+	}
+	return []byte(secret), nil
+}
 
 func GenerateTokenAdmin(nama string) (string, error) {
+	if strings.TrimSpace(nama) == "" {
+		return "", errors.New("admin ID/name cannot be empty")
+	}
+
+	secret, err := getAdminJwtSecret()
+	if err != nil {
+		return "", err
+	}
+
 	expiratedTime := time.Now().Add(24 * time.Hour)
 	claimsAdmin := &schemas.Claims{
 		IdUser: nama,
@@ -49,6 +68,6 @@ func GenerateTokenAdmin(nama string) (string, error) {
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
-	tokenAdmin := jwt.NewWithClaims(jwt.SigningMethodES256, claimsAdmin)
-	return tokenAdmin.SignedString(JwtAdminSign)
+	tokenAdmin := jwt.NewWithClaims(jwt.SigningMethodHS256, claimsAdmin)
+	return tokenAdmin.SignedString(secret)
 }

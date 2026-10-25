@@ -6,6 +6,8 @@ import { LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
+import { getAuthToken, clearAuthToken } from '@/lib/auth';
+
 export default function DashboardLayout({
   children,
 }: {
@@ -14,14 +16,14 @@ export default function DashboardLayout({
   const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = getAuthToken();
     if (!token) {
       router.push('/signin');
     }
   }, [router]);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    clearAuthToken();
     router.push('/signin');
   };
 

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Footer } from '@/components/layout/Footer';
+import { getApiUrl } from '@/lib/api';
 
 export default function SignInPage() {
   const router = useRouter();
@@ -21,7 +22,7 @@ export default function SignInPage() {
     setError('');
 
     try {
-      const res = await fetch('http://localhost:3000/api/login', {
+      const res = await fetch(getApiUrl('/api/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -33,22 +34,23 @@ export default function SignInPage() {
         throw new Error(data.message || data.error || 'Login failed');
       }
 
-      // Store JWT token
-      localStorage.setItem('token', data.user);
+      // Store JWT token (preferring 'token', with fallback to legacy 'user' field)
+      const token = data.token || data.user;
+      if (token) {
+        localStorage.setItem('token', token);
+      }
       
       // Redirect to dashboard
       router.push('/');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Login failed');
+      }
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSSOLogin = () => {
-    // Mock login for frontend testing without backend
-    localStorage.setItem('token', 'mock-sso-token');
-    router.push('/');
   };
 
   return (
@@ -69,16 +71,17 @@ export default function SignInPage() {
 
           <Button 
             variant="secondary" 
-            onClick={handleSSOLogin}
-            className="w-full mb-6 font-medium text-black bg-[#F0F4F8] hover:bg-[#E2E8F0]"
+            disabled
+            type="button"
+            className="w-full mb-6 font-medium text-gray-400 bg-[#F0F4F8] cursor-not-allowed opacity-75"
             leftIcon={
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-[#512BD4]">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-gray-400">
                 <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
                 <path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" fill="currentColor"/>
               </svg>
             }
           >
-            Sign In with myITS (SSO)
+            SSO myITS belum tersedia
           </Button>
 
           <div className="relative mb-6">
@@ -134,7 +137,7 @@ export default function SignInPage() {
               />
             </div>
 
-            <Button type="submit" className="w-full h-12 text-[15px] mb-6 mt-4" isLoading={loading} disabled={loading}>
+            <Button type="submit" className="w-full h-12 text-[15px] mb-6 mt-4" disabled={loading}>
               Sign In
             </Button>
           </form>

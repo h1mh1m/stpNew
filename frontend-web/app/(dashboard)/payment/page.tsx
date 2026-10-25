@@ -11,24 +11,6 @@ export default function PaymentPage() {
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
 
   const handleNext = () => {
-    // TEMPLATE UNTUK INTEGRASI BACKEND (Tim Backend/Integrasi)
-    // Silakan uncomment dan sesuaikan kode di bawah ini untuk menghubungkan dengan backend:
-    /*
-    const token = localStorage.getItem('token');
-    const orderId = '...'; // Ambil order ID dari state atau query params
-    fetch(`http://localhost:3000/api/payments/pay?order_id=${orderId}`, {
-      method: 'GET',
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-    .then(res => res.json())
-    .then(data => {
-       if (data.message === "Payment successful. Order is now Selesai.") {
-          setIsSummaryModalOpen(true);
-       }
-    })
-    .catch(err => console.error("Payment failed", err));
-    */
-
     // Default behavior for UI testing
     setIsSummaryModalOpen(true);
   };

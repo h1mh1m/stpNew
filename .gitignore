@@ -1,0 +1,20 @@
+# Guides, transcripts, and analysis context files
+*.txt
+AGENTS.md
+CLAUDE.md
+**/AGENTS.md
+**/CLAUDE.md
+
+# Environment and sensitive files
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Dependencies and build output
+node_modules/
+.next/
+dist/
+build/
+coverage/
+backend/backend

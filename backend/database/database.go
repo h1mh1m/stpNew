@@ -12,7 +12,7 @@ import (
 
 var DB *gorm.DB
 
-func ConnectDB() {
+func ConnectDB() error {
 	// Try loading .env from local or parent directory without failing if system env vars exist
 	_ = godotenv.Load(".env", "../.env")
 
@@ -35,9 +35,10 @@ func ConnectDB() {
 	database, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Println("Gagal menyambung ke database:", err)
-		return
+		return err
 	}
 	log.Println("Berhasil menyambung ke database")
 
 	DB = database
+	return nil
 }

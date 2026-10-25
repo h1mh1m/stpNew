@@ -1,43 +1,63 @@
 import React from 'react';
-import { MapPin, Users } from 'lucide-react';
+import Link from 'next/link';
+import { MapPin, Users, ArrowRight } from 'lucide-react';
+import { Room } from '@/lib/types';
+import { formatRupiah } from '@/lib/datetime';
 
 interface RoomCardProps {
-  title: string;
-  department: string;
-  location: string;
-  capacity: number;
-  price: string;
-  unit: string;
-  tag: string;
+  room: Room;
 }
 
-export const RoomCard = ({ title, department, location, capacity, price, unit, tag }: RoomCardProps) => {
+export const RoomCard: React.FC<RoomCardProps> = ({ room }) => {
+  const bookingUrl = `/booking?room_id=${encodeURIComponent(room.id)}`;
+
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-      {/* Blank Purple Block instead of Image */}
-      <div className="h-48 w-full bg-[#512BD4]"></div>
-      
-      <div className="p-5">
-        <div className="inline-block bg-[#007bff] text-white text-xs font-semibold px-3 py-1 rounded-md mb-4">
-          {tag}
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow flex flex-col justify-between">
+      <div>
+        <div className="h-64 bg-gray-200 relative overflow-hidden">
+          <img
+            src={room.image_url || 'https://images.unsplash.com/photo-1580274455191-1c62238fa333?auto=format&fit=crop&q=80&w=1000'}
+            alt={room.name}
+            className="w-full h-full object-cover"
+          />
         </div>
-        <h3 className="font-bold text-gray-900 text-lg mb-1">{title}</h3>
-        <p className="text-sm text-gray-500 mb-5">{department}</p>
-        
-        <div className="flex items-center space-x-6 text-xs text-gray-700 mb-5">
-          <div className="flex items-center">
-            <MapPin className="w-3.5 h-3.5 mr-1.5 text-[#007bff]" />
-            {location}
+        <div className="p-8 pb-4">
+          <div className="inline-block px-4 py-1.5 bg-[#007bff] text-white text-xs font-semibold rounded-full mb-4">
+            {room.features || 'Sirkuit Balap & Pengujian'}
           </div>
-          <div className="flex items-center">
-            <Users className="w-3.5 h-3.5 mr-1.5 text-[#007bff]" />
-            {capacity} Orang
+          <h3 className="text-2xl font-bold text-gray-900 mb-2">{room.name}</h3>
+          <p className="text-gray-500 mb-6 text-sm leading-relaxed">{room.description}</p>
+
+          <div className="flex flex-wrap items-center gap-6 text-xs text-gray-700 mb-6">
+            <div className="flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-[#007bff] shrink-0" aria-hidden="true" />
+              <span>Kampus ITS Sukolilo, Surabaya</span>
+            </div>
+            {room.capacity > 0 && (
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-[#007bff] shrink-0" aria-hidden="true" />
+                <span>Kapasitas: {room.capacity} Orang</span>
+              </div>
+            )}
           </div>
         </div>
-        
-        <div className="text-sm mt-auto pt-2 border-t border-gray-100">
-          <span className="font-bold text-[#007bff] text-lg">{price}</span>
-          <span className="text-gray-600 ml-1">{unit}</span>
+      </div>
+
+      <div className="p-8 pt-0">
+        <div className="pt-6 border-t border-gray-100 flex items-center justify-between gap-4">
+          <div>
+            <span className="text-xs text-gray-500 block">Biaya Reservasi</span>
+            <p className="text-3xl font-bold text-[#007bff] tracking-tight">
+              {formatRupiah(room.price)}
+            </p>
+          </div>
+          <Link
+            href={bookingUrl}
+            className="inline-flex items-center gap-2 bg-[#512BD4] hover:bg-[#4323af] text-white px-6 py-3 rounded-xl text-sm font-semibold transition-colors shadow-xs"
+          >
+            <span>Pesan Sirkuit</span>
+            <ArrowRight className="w-4 h-4" aria-hidden="true" />
+          </Link>
         </div>
       </div>
     </div>

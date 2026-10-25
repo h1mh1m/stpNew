@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Footer } from '@/components/layout/Footer';
+import { getApiUrl } from '@/lib/api';
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -23,7 +24,7 @@ export default function SignUpPage() {
     setError('');
 
     try {
-      const res = await fetch('http://localhost:3000/api/signup', {
+      const res = await fetch(getApiUrl('/api/signup'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -41,8 +42,12 @@ export default function SignUpPage() {
 
       alert('Registration successful!');
       router.push('/signin');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Registration failed');
+      }
     } finally {
       setLoading(false);
     }
@@ -159,7 +164,7 @@ export default function SignUpPage() {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full h-12 mb-6" isLoading={loading} disabled={loading}>
+              <Button type="submit" className="w-full h-12 mb-6" disabled={loading}>
                 Sign Up
               </Button>
             </form>

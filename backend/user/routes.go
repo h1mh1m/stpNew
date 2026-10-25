@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/resend/resend-go/v2"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/api/calendar/v3"
@@ -43,7 +44,16 @@ func LoginAlur(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "Email atau password salah"})
 		return
 	}
-	LegthToken, err := GenerateToken(user.ID)
+
+	if user.Status != "Verified" {
+		c.JSON(http.StatusForbidden, gin.H{
+			"message": "Email belum diverifikasi",
+			"error":   "Email belum diverifikasi",
+		})
+		return
+	}
+
+	tokenStr, err := GenerateToken(user.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "Cannot generate jwt"})
 		return
@@ -51,7 +61,9 @@ func LoginAlur(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Login berhasil",
-		"user":    LegthToken,
+		"token":   tokenStr,
+		// user is retained as a deprecated compatibility field for legacy frontend callers
+		"user": tokenStr,
 	})
 }
 
@@ -59,49 +71,84 @@ func RootWeb(c *gin.Context) {
 	c.Redirect(http.StatusFound, "/login")
 }
 
-var JwtKey string = os.Getenv("JWT")
+func getJwtSecret() ([]byte, error) {
+	secret := strings.TrimSpace(os.Getenv("JWT"))
+	if secret == "" {
+		return nil, errors.New("JWT secret is empty or not configured")
+	}
+	if len(secret) < 8 {
+		return nil, errors.New("JWT secret is unsafe (must be at least 8 characters)")
+	}
+	return []byte(secret), nil
+}
 
-func GenerateToken(nama string) (string, error) {
+func GenerateToken(userID string) (string, error) {
+	if strings.TrimSpace(userID) == "" {
+		return "", errors.New("customer ID cannot be empty")
+	}
+
+	secret, err := getJwtSecret()
+	if err != nil {
+		return "", err
+	}
+
 	expirateTime := time.Now().Add(2 * time.Hour)
 
 	claim := &schemas.Claims{
-		IdUser: nama,
+		IdUser: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirateTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodES256, claim)
-	return token.SignedString(JwtKey)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claim)
+	return token.SignedString(secret)
 }
 
 func AuthMiddlewareJwt() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization Token needed"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header is required"})
 			c.Abort()
 			return
 		}
-		tokenParts := strings.Split(authHeader, " ")
-		if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Format Header tidak ada atau rusak"})
+
+		tokenParts := strings.SplitN(authHeader, " ", 2)
+		if len(tokenParts) != 2 || tokenParts[0] != "Bearer" || strings.TrimSpace(tokenParts[1]) == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or missing Bearer token format"})
 			c.Abort()
 			return
 		}
-		tokenString := tokenParts[1]
+		tokenString := strings.TrimSpace(tokenParts[1])
+
+		secret, err := getJwtSecret()
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication unavailable"})
+			c.Abort()
+			return
+		}
+
 		claims := &schemas.Claims{}
 		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
-				return nil, fmt.Errorf("Method signning is not Valid")
+			if token.Method == nil || token.Method.Alg() != "HS256" || token.Method != jwt.SigningMethodHS256 {
+				return nil, fmt.Errorf("unexpected signing algorithm: %v", token.Header["alg"])
 			}
-			return JwtKey, nil
-		})
+			return secret, nil
+		}, jwt.WithExpirationRequired())
+
 		if err != nil || !token.Valid {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token tidak Valid"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token is invalid or expired"})
 			c.Abort()
 			return
 		}
+
+		if strings.TrimSpace(claims.IdUser) == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token missing customer ID claim"})
+			c.Abort()
+			return
+		}
+
 		c.Set("id", claims.IdUser)
 		c.Next()
 	}
@@ -207,44 +254,20 @@ func VerifyEmail(c *gin.Context) {
 }
 
 func DashboardPage(c *gin.Context) {
-	// Mock rooms data since database isn't fully seeded yet
-	rooms := []schemas.Room{
-		{
-			ID:          "1",
-			Name:        "Lab Pemrograman 1",
-			Description: "Departemen Teknik Informatika ITS - Zona A",
-			Capacity:    25,
-			Price:       90000,
-			ImageURL:    "",
-			Features:    "Jangka Pendek",
-		},
-		{
-			ID:          "2",
-			Name:        "Lab Pemrograman 2",
-			Description: "Departemen Teknik Informatika ITS - Zona A",
-			Capacity:    25,
-			Price:       100000,
-			ImageURL:    "",
-			Features:    "Jangka Pendek",
-		},
-		{
-			ID:          "3",
-			Name:        "Gedung NASDEC",
-			Description: "Institut Teknologi Sepuluh Nopember - Zona C",
-			Capacity:    100,
-			Price:       5000000,
-			ImageURL:    "",
-			Features:    "Jangka Panjang",
-		},
-		{
-			ID:          "4",
-			Name:        "Menara Sains",
-			Description: "Institut Teknologi Sepuluh Nopember - Zona C",
-			Capacity:    50,
-			Price:       10000000,
-			ImageURL:    "",
-			Features:    "Jangka Panjang",
-		},
+	if databases.DB == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection is not available"})
+		return
+	}
+
+	var rooms []schemas.Room
+	if err := databases.DB.Find(&rooms).Error; err != nil {
+		log.Printf("Error querying room catalogue: %v\n", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch room catalogue"})
+		return
+	}
+
+	if rooms == nil {
+		rooms = []schemas.Room{}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -300,10 +323,20 @@ func GetBookings(c *gin.Context) {
 		return
 	}
 
+	if databases.DB == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection is not available"})
+		return
+	}
+
 	var orders []schemas.Order
-	if err := databases.DB.Where("user_id = ?", userId).Find(&orders).Error; err != nil {
+	if err := databases.DB.Where("user_id = ?", userId).Order("created_at DESC").Find(&orders).Error; err != nil {
+		log.Printf("Error fetching orders for user %v: %v\n", userId, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch orders"})
 		return
+	}
+
+	if orders == nil {
+		orders = []schemas.Order{}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -312,67 +345,260 @@ func GetBookings(c *gin.Context) {
 	})
 }
 
-func CreateBooking(c *gin.Context) {
-	userId, exists := c.Get("id")
+// GetRoomAvailability returns occupied blocking intervals for a specific room.
+// Only schedules with BlockingStatuses (Menunggu Pembayaran, Selesai) are returned.
+// Other customers' user IDs, names, emails, and order prices are strictly omitted.
+func GetRoomAvailability(c *gin.Context) {
+	_, exists := c.Get("id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 
+	roomID := strings.TrimSpace(c.Param("room_id"))
+	if roomID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "room_id wajib diisi"})
+		return
+	}
+
+	if databases.DB == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database service unavailable"})
+		return
+	}
+
+	// 1. Verify room exists
+	var room schemas.Room
+	if err := databases.DB.Where("id = ?", roomID).First(&room).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Ruangan tidak ditemukan"})
+			return
+		}
+		log.Printf("Error verifying room %s: %v\n", roomID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal memverifikasi ruangan"})
+		return
+	}
+
+	// 2. Parse optional bounded range
+	// Default start: 5 minutes ago to include current active slots
+	now := time.Now().UTC()
+	rangeStart := now.Add(-5 * time.Minute)
+	// Default finish: 90 days from now
+	rangeFinish := now.AddDate(0, 3, 0)
+
+	if startParam := strings.TrimSpace(c.Query("start")); startParam != "" {
+		parsedStart, err := time.Parse(time.RFC3339, startParam)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "format parameter start tidak valid: harus RFC 3339"})
+			return
+		}
+		rangeStart = parsedStart.UTC()
+	}
+
+	if finishParam := strings.TrimSpace(c.Query("finish")); finishParam != "" {
+		parsedFinish, err := time.Parse(time.RFC3339, finishParam)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "format parameter finish tidak valid: harus RFC 3339"})
+			return
+		}
+		rangeFinish = parsedFinish.UTC()
+	}
+
+	if rangeFinish.Before(rangeStart) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "parameter finish harus lebih lambat dari atau sama dengan start"})
+		return
+	}
+
+	// Bounded limit: prevent querying more than 1 year span
+	if rangeFinish.Sub(rangeStart) > 366*24*time.Hour {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "rentang waktu ketersediaan maksimal 1 tahun"})
+		return
+	}
+
+	// 3. Query blocking orders within range
+	var slots []schemas.AvailabilitySlot
+	if err := databases.DB.Model(&schemas.Order{}).
+		Select("room_id, date_start, date_finish, status").
+		Where("room_id = ? AND status IN (?) AND date_finish >= ? AND date_start <= ?",
+			room.ID, schemas.BlockingStatuses, rangeStart, rangeFinish).
+		Order("date_start ASC").
+		Scan(&slots).Error; err != nil {
+		log.Printf("Error fetching availability for room %s: %v\n", room.ID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil data ketersediaan ruangan"})
+		return
+	}
+
+	if slots == nil {
+		slots = []schemas.AvailabilitySlot{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Success",
+		"data":    slots,
+	})
+}
+
+// ValidateBookingInterval validates and parses RFC 3339 timestamps into UTC time.Time.
+// It enforces finish > start and rejects past start times (allowing 5-minute clock tolerance).
+func ValidateBookingInterval(startStr, finishStr string, now time.Time) (time.Time, time.Time, error) {
+	if strings.TrimSpace(startStr) == "" || strings.TrimSpace(finishStr) == "" {
+		return time.Time{}, time.Time{}, errors.New("date_start dan date_finish wajib diisi")
+	}
+
+	start, err := time.Parse(time.RFC3339, startStr)
+	if err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("format date_start tidak valid: harus RFC 3339 (misal: 2026-11-01T08:00:00Z)")
+	}
+
+	finish, err := time.Parse(time.RFC3339, finishStr)
+	if err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("format date_finish tidak valid: harus RFC 3339 (misal: 2026-11-01T10:00:00Z)")
+	}
+
+	startUTC := start.UTC()
+	finishUTC := finish.UTC()
+
+	if !finishUTC.After(startUTC) {
+		return time.Time{}, time.Time{}, errors.New("waktu selesai harus lebih lambat dari waktu mulai")
+	}
+
+	// Clock tolerance of 5 minutes for slight server-client clock drift
+	if startUTC.Before(now.UTC().Add(-5 * time.Minute)) {
+		return time.Time{}, time.Time{}, errors.New("waktu mulai tidak boleh di masa lampau")
+	}
+
+	return startUTC, finishUTC, nil
+}
+
+// HasIntervalOverlap checks if [start1, finish1) overlaps with [start2, finish2).
+// Semantics: start is inclusive, finish is exclusive.
+func HasIntervalOverlap(start1, finish1, start2, finish2 time.Time) bool {
+	return start1.Before(finish2) && finish1.After(start2)
+}
+
+// IsExclusionConstraintViolation checks if an error represents a PostgreSQL exclusion violation (SQLSTATE 23P01).
+// Stable typed error classification only (errors.As on *pgconn.PgError).
+func IsExclusionConstraintViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23P01"
+	}
+	return false
+}
+
+func CreateBooking(c *gin.Context) {
+	userIdVal, exists := c.Get("id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	userId, ok := userIdVal.(string)
+	if !ok || strings.TrimSpace(userId) == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: user ID tidak valid"})
+		return
+	}
+
 	var req schemas.BookingSchema
 	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Request body tidak valid atau field wajib kosong"})
+		return
+	}
+
+	if strings.TrimSpace(req.RoomID) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "room_id wajib diisi"})
+		return
+	}
+
+	startUTC, finishUTC, err := ValidateBookingInterval(req.DateStart, req.DateFinish, time.Now())
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Schedule Conflict Validation
-	// Overlap occurs if: new_start < existing_finish AND new_finish > existing_start
-	var existingOrder schemas.Order
-	conflictErr := databases.DB.Where("room_id = ? AND status IN (?, ?) AND date_start < ? AND date_finish > ?", 
-		req.RoomID, "Selesai", "Menunggu Pembayaran", req.DateFinish, req.DateStart).First(&existingOrder).Error
-	
-	if conflictErr == nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "Room is already booked for the selected schedule. Schedule Conflict!"})
-		return
-	} else if !errors.Is(conflictErr, gorm.ErrRecordNotFound) {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error checking schedule conflicts"})
+	if databases.DB == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database service unavailable"})
 		return
 	}
 
-	// If no conflict, mock finding the room for price (using a dummy price for now)
+	ctx := c.Request.Context()
+	tx := databases.DB.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		log.Printf("Failed to begin booking transaction: %v\n", tx.Error)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal memulai transaksi reservasi"})
+		return
+	}
+	defer tx.Rollback()
+
+	// 1. Authoritative Room Lookup: room must exist in database
 	var room schemas.Room
-	databases.DB.Where("id = ?", req.RoomID).First(&room)
-	price := room.Price
-	if price == 0 {
-		price = 100000 // default dummy price if not seeded
+	if err := tx.Where("id = ?", req.RoomID).First(&room).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Ruangan tidak ditemukan"})
+			return
+		}
+		log.Printf("Error querying room %s: %v\n", req.RoomID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal memverifikasi ruangan"})
+		return
 	}
 
+	// 2. Preliminary friendly overlap check
+	var conflictCount int64
+	if err := tx.Model(&schemas.Order{}).
+		Where("room_id = ? AND status IN (?) AND date_start < ? AND date_finish > ?",
+			room.ID, schemas.BlockingStatuses, finishUTC, startUTC).
+		Count(&conflictCount).Error; err != nil {
+		log.Printf("Error checking booking overlap: %v\n", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal memeriksa ketersediaan jadwal"})
+		return
+	}
+	if conflictCount > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "Jadwal bentrok: Ruangan sudah dipesan untuk jadwal yang dipilih"})
+		return
+	}
+
+	// 3. Create Order with authoritative price and server-side status
 	orderId := uuid.NewString()
 	newOrder := schemas.Order{
 		ID:         orderId,
-		UserID:     userId.(string),
-		RoomID:     req.RoomID,
-		DateStart:  req.DateStart,
-		DateFinish: req.DateFinish,
-		Status:     "Menunggu Pembayaran",
-		TotalPrice: price,
+		UserID:     userId,
+		RoomID:     room.ID,
+		DateStart:  startUTC,
+		DateFinish: finishUTC,
+		Status:     schemas.StatusMenungguPembayaran,
+		TotalPrice: room.Price,
 	}
 
-	if err := databases.DB.Create(&newOrder).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create booking"})
+	if err := tx.Create(&newOrder).Error; err != nil {
+		if IsExclusionConstraintViolation(err) {
+			log.Printf("Exclusion constraint caught concurrent booking conflict for room %s\n", room.ID)
+			c.JSON(http.StatusConflict, gin.H{"error": "Jadwal bentrok: Ruangan sudah dipesan untuk jadwal yang dipilih"})
+			return
+		}
+		log.Printf("Failed to create order: %v\n", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal membuat reservasi"})
 		return
 	}
 
-	// System Payment Mock
-	paymentLink := fmt.Sprintf("http://localhost:3000/api/payments/pay?order_id=%s", orderId)
+	if err := tx.Commit().Error; err != nil {
+		if IsExclusionConstraintViolation(err) {
+			c.JSON(http.StatusConflict, gin.H{"error": "Jadwal bentrok: Ruangan sudah dipesan untuk jadwal yang dipilih"})
+			return
+		}
+		log.Printf("Failed to commit booking transaction: %v\n", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menyelesaikan reservasi"})
+		return
+	}
 
-	c.JSON(http.StatusOK, gin.H{
+	c.JSON(http.StatusCreated, gin.H{
 		"message": "Booking created successfully",
-		"payment_link": paymentLink,
-		"data": newOrder,
+		"data":    newOrder,
 	})
 }
 
+// TODO: Replace MockPaymentWebhook with a signed POST payment provider webhook or administrator-controlled simulation endpoint.
+// SECURITY NOTICE: This handler is unmounted from routing in backend/main.go during Phase 1 containment.
 func MockPaymentWebhook(c *gin.Context) {
 	orderId := c.Query("order_id")
 	if orderId == "" {
@@ -399,6 +625,6 @@ func MockPaymentWebhook(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Payment successful. Order is now Selesai.",
-		"order": order,
+		"order":   order,
 	})
 }
