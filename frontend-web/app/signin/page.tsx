@@ -21,7 +21,7 @@ export default function SignInPage() {
     setError('');
 
     try {
-      const res = await fetch('http://localhost:3000/api/login', {
+      const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -38,8 +38,12 @@ export default function SignInPage() {
       
       // Redirect to dashboard
       router.push('/');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Login failed');
+      }
     } finally {
       setLoading(false);
     }

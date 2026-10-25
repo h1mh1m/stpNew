@@ -10,7 +10,7 @@ import (
 type Customer struct {
 	ID          string         `gorm:"primaryKey;column:id" json:"id"`
 	Nama        string         `gorm:"column:nama" json:"nama"`
-	Email       string         `gorm:"column:email" json:"email"`
+	Email       string         `gorm:"column:email;unique" json:"email"`
 	NomerTelpon string         `gorm:"column:nomer_telpon" json:"nomer_telpon"`
 	Password    string         `gorm:"column:password" json:"-"`
 	Status      string         `gorm:"column:status" json:"status"`

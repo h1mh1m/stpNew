@@ -59,7 +59,13 @@ func RootWeb(c *gin.Context) {
 	c.Redirect(http.StatusFound, "/login")
 }
 
-var JwtKey string = os.Getenv("JWT")
+func getJwtSecret() []byte {
+	key := os.Getenv("JWT")
+	if key == "" {
+		key = "qwertyuiokmnhgf"
+	}
+	return []byte(key)
+}
 
 func GenerateToken(nama string) (string, error) {
 	expirateTime := time.Now().Add(2 * time.Hour)
@@ -71,8 +77,8 @@ func GenerateToken(nama string) (string, error) {
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodES256, claim)
-	return token.SignedString(JwtKey)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claim)
+	return token.SignedString(getJwtSecret())
 }
 
 func AuthMiddlewareJwt() gin.HandlerFunc {
@@ -92,10 +98,10 @@ func AuthMiddlewareJwt() gin.HandlerFunc {
 		tokenString := tokenParts[1]
 		claims := &schemas.Claims{}
 		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
-				return nil, fmt.Errorf("Method signning is not Valid")
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
-			return JwtKey, nil
+			return getJwtSecret(), nil
 		})
 		if err != nil || !token.Valid {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token tidak Valid"})
@@ -149,7 +155,7 @@ func SignupAlur(c *gin.Context) {
 
 	if resendAPI != "" && secretToken != "" {
 		client := resend.NewClient(resendAPI)
-		verifyLink := fmt.Sprintf("http://localhost:3000/api/verify?token=%s&email=%s", secretToken, person.Email)
+		verifyLink := fmt.Sprintf("http://10.10.101.196:3000/api/verify?token=%s&email=%s", secretToken, person.Email)
 		params := &resend.SendEmailRequest{
 			From:    "Onboarding <onboarding@resend.dev>",
 			To:      []string{person.Email},
@@ -328,9 +334,9 @@ func CreateBooking(c *gin.Context) {
 	// Schedule Conflict Validation
 	// Overlap occurs if: new_start < existing_finish AND new_finish > existing_start
 	var existingOrder schemas.Order
-	conflictErr := databases.DB.Where("room_id = ? AND status IN (?, ?) AND date_start < ? AND date_finish > ?", 
+	conflictErr := databases.DB.Where("room_id = ? AND status IN (?, ?) AND date_start < ? AND date_finish > ?",
 		req.RoomID, "Selesai", "Menunggu Pembayaran", req.DateFinish, req.DateStart).First(&existingOrder).Error
-	
+
 	if conflictErr == nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "Room is already booked for the selected schedule. Schedule Conflict!"})
 		return
@@ -349,9 +355,10 @@ func CreateBooking(c *gin.Context) {
 
 	orderId := uuid.NewString()
 	newOrder := schemas.Order{
-		ID:         orderId,
-		UserID:     userId.(string),
-		RoomID:     req.RoomID,
+		ID:     orderId,
+		UserID: userId.(string),
+		RoomID: req.RoomID,
+
 		DateStart:  req.DateStart,
 		DateFinish: req.DateFinish,
 		Status:     "Menunggu Pembayaran",
@@ -367,9 +374,9 @@ func CreateBooking(c *gin.Context) {
 	paymentLink := fmt.Sprintf("http://localhost:3000/api/payments/pay?order_id=%s", orderId)
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Booking created successfully",
+		"message":      "Booking created successfully",
 		"payment_link": paymentLink,
-		"data": newOrder,
+		"data":         newOrder,
 	})
 }
 
@@ -399,6 +406,6 @@ func MockPaymentWebhook(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Payment successful. Order is now Selesai.",
-		"order": order,
+		"order":   order,
 	})
 }

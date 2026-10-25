@@ -34,11 +34,31 @@ func AdminLogin(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "Your Password is not Correct"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "You are Logged in"})
 
+	token, err := GenerateTokenAdmin(AdminDb.Nama)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Cannot generate jwt"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "You are Logged in",
+		"token":   token,
+	})
 }
 
 var JwtAdminSign string = os.Getenv("JWTADMIN")
+
+func getJwtAdminSecret() []byte {
+	key := os.Getenv("JWTADMIN")
+	if key == "" {
+		key = JwtAdminSign
+	}
+	if key == "" {
+		key = "qwertyuytrewqwertdxdfsdcasvhh"
+	}
+	return []byte(key)
+}
 
 func GenerateTokenAdmin(nama string) (string, error) {
 	expiratedTime := time.Now().Add(24 * time.Hour)
@@ -49,6 +69,6 @@ func GenerateTokenAdmin(nama string) (string, error) {
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
-	tokenAdmin := jwt.NewWithClaims(jwt.SigningMethodES256, claimsAdmin)
-	return tokenAdmin.SignedString(JwtAdminSign)
+	tokenAdmin := jwt.NewWithClaims(jwt.SigningMethodHS256, claimsAdmin)
+	return tokenAdmin.SignedString(getJwtAdminSecret())
 }

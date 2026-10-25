@@ -23,7 +23,7 @@ export default function SignUpPage() {
     setError('');
 
     try {
-      const res = await fetch('http://localhost:3000/api/signup', {
+      const res = await fetch('/api/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -41,8 +41,12 @@ export default function SignUpPage() {
 
       alert('Registration successful!');
       router.push('/signin');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Registration failed');
+      }
     } finally {
       setLoading(false);
     }

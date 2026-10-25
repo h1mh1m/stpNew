@@ -18,7 +18,7 @@ const team = [
 export default function AboutUs() {
   return (
     <div className="py-12 mt-4 border-t border-gray-200">
-      <h2 className="text-2xl font-bold text-gray-900 mb-8 px-2 border-l-4 border-[#512BD4]">Who's Us</h2>
+      <h2 className="text-2xl font-bold text-gray-900 mb-8 px-2 border-l-4 border-[#512BD4]">Who&apos;s Us</h2>
       <div className="flex flex-wrap gap-8 px-2">
         {team.map((member) => (
           <div key={member.id} className="flex flex-col items-center flex-shrink-0 w-48 group">

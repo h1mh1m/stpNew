@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, ShoppingCart, User, LogOut } from 'lucide-react';
+import { Home, ShoppingCart, User } from 'lucide-react';
 
 const menuItems = [
   { name: 'Beranda', href: '/', icon: Home },

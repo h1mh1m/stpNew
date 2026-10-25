@@ -69,11 +69,21 @@ export default function BookingPage() {
           </div>
           
           <div className="flex items-center justify-center gap-4">
-            <button className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-900">
+            <button 
+              onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-900"
+              aria-label="Previous Month"
+            >
               <ChevronLeft className="w-6 h-6" />
             </button>
-            <h3 className="text-xl font-bold text-gray-900">Agustus</h3>
-            <button className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-900">
+            <h3 className="text-xl font-bold text-gray-900 min-w-36 text-center">
+              {currentMonth.toLocaleString('id-ID', { month: 'long', year: 'numeric' })}
+            </h3>
+            <button 
+              onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-900"
+              aria-label="Next Month"
+            >
               <ChevronRight className="w-6 h-6" />
             </button>
           </div>
